@@ -1,38 +1,43 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from js import document
 from pyodide.http import pyfetch
 
 
-# Fixed USGS streamgages.
-SITE_NUMBERS = [
-    "08313000",
-    "08317400",
-    "08328950",
-    "08329900",
-    "08329918",
-    "08329928",
-    "08330000",
-    "08330775",
-    "08330830",
-    "08330875",
-    "08331160",
-    "08331510",
-    "08332010",
-    "08353000",
-    "08354900",
-    "08355050",
-    "08355490",
-    "08358300",
-    "08358400",
-    "08359500",
+# Edit only the text after "name" to customize table labels.
+# The site number remains internal and is not displayed in the table.
+GAGES = [
+    {"site": "08313000", "name": "Rio Grande at Otowi Bridge, NM"},
+    {"site": "08317400", "name": "Rio Grande below Cochiti Dam, NM"},
+    {"site": "08328950", "name": "Rio Grande at Alameda Bridge, NM"},
+    {"site": "08329900", "name": "Rio Grande at Albuquerque, NM"},
+    {"site": "08329918", "name": "Rio Grande at Central Avenue, Albuquerque, NM"},
+    {"site": "08329928", "name": "Rio Grande at Barelas Bridge, Albuquerque, NM"},
+    {"site": "08330000", "name": "Rio Grande at Albuquerque, NM"},
+    {"site": "08330775", "name": "Rio Grande at Rio Bravo Boulevard, Albuquerque, NM"},
+    {"site": "08330830", "name": "Rio Grande at I-25, Albuquerque, NM"},
+    {"site": "08330875", "name": "Rio Grande at Isleta Lakes, NM"},
+    {"site": "08331160", "name": "Rio Grande near Bosque Farms, NM"},
+    {"site": "08331510", "name": "Rio Grande near Belen, NM"},
+    {"site": "08332010", "name": "Rio Grande near Bernardo, NM"},
+    {"site": "08353000", "name": "Rio Puerco above Arroyo Chico, NM"},
+    {"site": "08354900", "name": "Rio Salado near San Acacia, NM"},
+    {"site": "08355050", "name": "Rio Grande below Elephant Butte Dam, NM"},
+    {"site": "08355490", "name": "Rio Grande below Caballo Dam, NM"},
+    {"site": "08358300", "name": "Rio Grande at Leasburg Dam, NM"},
+    {"site": "08358400", "name": "Rio Grande below Leasburg Dam, NM"},
+    {"site": "08359500", "name": "Rio Grande below Percha Dam, NM"},
 ]
 
 USGS_API_ROOT = "https://api.waterdata.usgs.gov/ogcapi/v1/collections"
-DISCHARGE_PARAMETER_CODE = "00060"
+DISCHARGE_PARAMETER = "00060"
+
+# Retrieve enough history to accommodate 15-, 30-, or 60-minute reporting.
 LOOKBACK_HOURS = 2
+
+# Use a record between 30 and 90 minutes before the current observation.
 MIN_PRIOR_MINUTES = 30
 MAX_PRIOR_MINUTES = 90
 
@@ -57,8 +62,8 @@ def parse_time(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def format_local_time(timestamp_text):
-    timestamp = parse_time(timestamp_text)
+def format_local_time(value):
+    timestamp = parse_time(value)
     if timestamp is None:
         return "—"
     return timestamp.astimezone().strftime("%Y-%m-%d %H:%M %Z")
@@ -67,148 +72,173 @@ def format_local_time(timestamp_text):
 def format_flow(value):
     if value in (None, ""):
         return "—"
+
     try:
         return f"{float(value):,.1f}"
     except (TypeError, ValueError):
         return str(value)
 
 
-def flow_value(properties):
+def numeric_flow(properties):
     try:
         return float(properties.get("value"))
     except (TypeError, ValueError):
         return None
 
 
-def api_url(collection, params):
-    return f"{USGS_API_ROOT}/{collection}/items?{urlencode(params)}"
+def site_id(site_number):
+    return f"USGS-{site_number}"
+
+
+def collection_url(collection, params):
+    # doseq=True is essential: it turns a Python list into repeated
+    # monitoring_location_id=query parameters.
+    query_string = urlencode(params, doseq=True)
+    return f"{USGS_API_ROOT}/{collection}/items?{query_string}"
 
 
 async def get_json(url):
     response = await pyfetch(url)
+
     if not response.ok:
         raise RuntimeError(f"USGS API returned HTTP {response.status}.")
+
     return await response.json()
 
 
-async def get_gage_name(site_number):
-    params = {
-        "f": "json",
-        "monitoring_location_id": f"USGS-{site_number}",
-        "limit": 1,
-    }
-
-    payload = await get_json(api_url("monitoring-locations", params))
-    features = payload.get("features", [])
-
-    if not features:
-        return "Name unavailable"
-
-    properties = features[0].get("properties", {})
-    return properties.get("monitoring_location_name") or "Name unavailable"
-
-
-async def get_latest_discharge(site_number):
-    params = {
-        "f": "json",
-        "monitoring_location_id": f"USGS-{site_number}",
-        "parameter_code": DISCHARGE_PARAMETER_CODE,
-        "limit": 20,
-    }
-
-    payload = await get_json(api_url("latest-continuous", params))
-
-    candidates = [
+def discharge_properties(payload):
+    return [
         feature.get("properties", {})
         for feature in payload.get("features", [])
         if feature.get("properties", {}).get("parameter_code")
-        == DISCHARGE_PARAMETER_CODE
+        == DISCHARGE_PARAMETER
     ]
 
-    if not candidates:
-        return None
 
-    candidates.sort(key=lambda item: item.get("time", ""), reverse=True)
-    return candidates[0]
-
-
-async def get_prior_discharge(site_number, latest_time):
-    latest_dt = parse_time(latest_time)
-    if latest_dt is None:
-        return None
-
-    start_time = latest_dt - timedelta(hours=LOOKBACK_HOURS)
-
+async def get_latest_observations():
     params = {
         "f": "json",
-        "monitoring_location_id": f"USGS-{site_number}",
-        "parameter_code": DISCHARGE_PARAMETER_CODE,
-        "datetime": f"{start_time.isoformat()}/{latest_dt.isoformat()}",
-        "limit": 500,
+        "monitoring_location_id": [site_id(gage["site"]) for gage in GAGES],
+        "parameter_code": DISCHARGE_PARAMETER,
+        "limit": 1000,
     }
 
-    payload = await get_json(api_url("continuous", params))
+    payload = await get_json(collection_url("latest-continuous", params))
+    observations = discharge_properties(payload)
 
-    observations = [
-        feature.get("properties", {})
-        for feature in payload.get("features", [])
-        if feature.get("properties", {}).get("parameter_code")
-        == DISCHARGE_PARAMETER_CODE
-    ]
-
-    eligible = []
+    latest_by_site = {}
 
     for observation in observations:
-        observation_time = parse_time(observation.get("time"))
-        if observation_time is None:
+        location_id = observation.get("monitoring_location_id")
+        observation_time = observation.get("time", "")
+
+        current = latest_by_site.get(location_id)
+
+        if current is None or observation_time > current.get("time", ""):
+            latest_by_site[location_id] = observation
+
+    return latest_by_site
+
+
+async def get_historical_observations(latest_by_site):
+    latest_times = [
+        parse_time(observation.get("time"))
+        for observation in latest_by_site.values()
+        if parse_time(observation.get("time")) is not None
+    ]
+
+    if not latest_times:
+        return []
+
+    # A single shared query window covers all gages. The end buffer handles
+    # small timestamp differences among latest station observations.
+    query_end = max(latest_times) + timedelta(minutes=1)
+    query_start = min(latest_times) - timedelta(hours=LOOKBACK_HOURS)
+
+    params = {
+        "f": "json",
+        "monitoring_location_id": [site_id(gage["site"]) for gage in GAGES],
+        "parameter_code": DISCHARGE_PARAMETER,
+        "datetime": f"{query_start.isoformat()}/{query_end.isoformat()}",
+        "limit": 10000,
+    }
+
+    payload = await get_json(collection_url("continuous", params))
+    return discharge_properties(payload)
+
+
+def choose_prior_observations(latest_by_site, historical_observations):
+    history_by_site = {}
+
+    for observation in historical_observations:
+        location_id = observation.get("monitoring_location_id")
+        history_by_site.setdefault(location_id, []).append(observation)
+
+    prior_by_site = {}
+
+    for location_id, latest in latest_by_site.items():
+        latest_time = parse_time(latest.get("time"))
+
+        if latest_time is None:
             continue
 
-        age_minutes = (latest_dt - observation_time).total_seconds() / 60
+        candidates = []
 
-        if MIN_PRIOR_MINUTES <= age_minutes <= MAX_PRIOR_MINUTES:
-            eligible.append((abs(age_minutes - 60), observation))
+        for observation in history_by_site.get(location_id, []):
+            observation_time = parse_time(observation.get("time"))
 
-    if not eligible:
+            if observation_time is None:
+                continue
+
+            age_minutes = (latest_time - observation_time).total_seconds() / 60
+
+            if MIN_PRIOR_MINUTES <= age_minutes <= MAX_PRIOR_MINUTES:
+                candidates.append((abs(age_minutes - 60), observation))
+
+        if candidates:
+            candidates.sort(key=lambda item: item[0])
+            prior_by_site[location_id] = candidates[0][1]
+
+    return prior_by_site
+
+
+def calculate_rate(latest, prior):
+    if latest is None or prior is None:
         return None
 
-    eligible.sort(key=lambda item: item[0])
-    return eligible[0][1]
-
-
-def calculate_rate(latest_properties, prior_properties):
-    if latest_properties is None or prior_properties is None:
-        return None
-
-    latest_q = flow_value(latest_properties)
-    prior_q = flow_value(prior_properties)
-    latest_time = parse_time(latest_properties.get("time"))
-    prior_time = parse_time(prior_properties.get("time"))
+    latest_value = numeric_flow(latest)
+    prior_value = numeric_flow(prior)
+    latest_time = parse_time(latest.get("time"))
+    prior_time = parse_time(prior.get("time"))
 
     if (
-        latest_q is None
-        or prior_q is None
+        latest_value is None
+        or prior_value is None
         or latest_time is None
         or prior_time is None
     ):
         return None
 
     elapsed_hours = (latest_time - prior_time).total_seconds() / 3600
+
     if elapsed_hours <= 0:
         return None
 
-    return (latest_q - prior_q) / elapsed_hours
+    return (latest_value - prior_value) / elapsed_hours
 
 
-def render_table(rows):
+def render_table(latest_by_site, prior_by_site):
     tbody = document.getElementById("gage-results")
     tbody.innerHTML = ""
 
-    for row_data in rows:
+    for gage in GAGES:
         row = document.createElement("tr")
-        gage_name = row_data.get("gage_name") or "Name unavailable"
-        latest = row_data["latest"]
 
-        make_cell(row, gage_name, "no-data" if latest is None else "")
+        location_id = site_id(gage["site"])
+        latest = latest_by_site.get(location_id)
+        prior = prior_by_site.get(location_id)
+
+        make_cell(row, gage["name"])
 
         if latest is None:
             make_cell(row, "—", "numeric no-data")
@@ -220,12 +250,19 @@ def render_table(rows):
         make_cell(row, format_flow(latest.get("value")), "numeric")
         make_cell(row, format_local_time(latest.get("time")))
 
-        rate = row_data["rate"]
+        rate = calculate_rate(latest, prior)
+
         if rate is None:
             make_cell(row, "—", "numeric no-data")
         else:
-            rate_class = "positive" if rate > 0 else "negative" if rate < 0 else ""
-            make_cell(row, f"{rate:+,.1f}", f"numeric {rate_class}")
+            css_class = (
+                "positive"
+                if rate > 0
+                else "negative"
+                if rate < 0
+                else ""
+            )
+            make_cell(row, f"{rate:+,.1f}", f"numeric {css_class}")
 
         tbody.appendChild(row)
 
@@ -235,70 +272,35 @@ async def load_all_gages(event=None):
     button.disabled = True
 
     try:
-        set_status(f"Retrieving USGS data for {len(SITE_NUMBERS)} gages…")
+        set_status(f"Requesting current discharge for {len(GAGES)} gages…")
 
-        latest_records, gage_names = await asyncio.gather(
-            asyncio.gather(
-                *[get_latest_discharge(site) for site in SITE_NUMBERS],
-                return_exceptions=True,
-            ),
-            asyncio.gather(
-                *[get_gage_name(site) for site in SITE_NUMBERS],
-                return_exceptions=True,
-            ),
+        latest_by_site = await get_latest_observations()
+
+        set_status("Retrieving the preceding two hours of discharge observations…")
+
+        historical_observations = await get_historical_observations(
+            latest_by_site
+        )
+        prior_by_site = choose_prior_observations(
+            latest_by_site,
+            historical_observations,
         )
 
-        rows = []
-        for site_number, latest_result, name_result in zip(
-            SITE_NUMBERS,
-            latest_records,
-            gage_names,
-        ):
-            latest = (
-                latest_result
-                if not isinstance(latest_result, Exception)
-                else None
-            )
-            gage_name = (
-                name_result
-                if not isinstance(name_result, Exception)
-                else "Name unavailable"
-            )
+        render_table(latest_by_site, prior_by_site)
 
-            rows.append(
-                {
-                    "site_number": site_number,
-                    "gage_name": gage_name,
-                    "latest": latest,
-                    "prior": None,
-                    "rate": None,
-                }
-            )
-
-        set_status("Calculating discharge change over the preceding hour…")
-
-        prior_records = await asyncio.gather(
-            *[
-                get_prior_discharge(row["site_number"], row["latest"]["time"])
-                if row["latest"] is not None
-                else asyncio.sleep(0, result=None)
-                for row in rows
-            ],
-            return_exceptions=True,
+        successful = sum(
+            1
+            for gage in GAGES
+            if site_id(gage["site"]) in latest_by_site
         )
 
-        for row, prior_result in zip(rows, prior_records):
-            prior = prior_result if not isinstance(prior_result, Exception) else None
-            row["prior"] = prior
-            row["rate"] = calculate_rate(row["latest"], prior)
+        updated_time = datetime.now().astimezone().strftime(
+            "%Y-%m-%d %H:%M %Z"
+        )
 
-        render_table(rows)
-
-        successful = sum(row["latest"] is not None for row in rows)
-        timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
         set_status(
-            f"Updated {timestamp}. Current discharge returned for "
-            f"{successful} of {len(SITE_NUMBERS)} gages."
+            f"Updated {updated_time}. Current discharge returned for "
+            f"{successful} of {len(GAGES)} gages."
         )
 
     except Exception as exc:
