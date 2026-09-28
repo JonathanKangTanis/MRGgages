@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USGS Current Discharge</title>
+
+  <script type="module" src="https://pyscript.net/releases/2025.5.1/core.js"></script>
+
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #15202b;
+      background: #f6f8fa;
+    }
+
+    body {
+      max-width: 1050px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    h1 {
+      margin-bottom: 0.35rem;
+    }
+
+    .note {
+      color: #536471;
+      margin-top: 0;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+      margin: 1.5rem 0;
+    }
+
+    label {
+      display: grid;
+      gap: 0.35rem;
+      font-weight: 600;
+    }
+
+    input {
+      min-width: min(100%, 420px);
+      padding: 0.65rem;
+      font: inherit;
+      border: 1px solid #aab8c2;
+      border-radius: 0.35rem;
+    }
+
+    button {
+      padding: 0.65rem 1rem;
+      font: inherit;
+      font-weight: 650;
+      color: white;
+      background: #1667a8;
+      border: 0;
+      border-radius: 0.35rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0e528a;
+    }
+
+    #status {
+      min-height: 1.5rem;
+      margin: 0.75rem 0;
+    }
+
+    .error {
+      color: #a61b1b;
+      font-weight: 600;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: white;
+      border: 1px solid #d7dde3;
+      border-radius: 0.45rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 0.7rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid #e7ebef;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #edf4f8;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .numeric {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .provisional {
+      color: #875900;
+    }
+
+    .approved {
+      color: #176b3a;
+    }
+
+    .muted {
+      color: #536471;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>USGS current stream discharge</h1>
+  <p class="note">
+    Fetches the most recent USGS continuous-discharge observation
+    (parameter code 00060) for each requested streamgage.
+  </p>
+
+  <div class="controls">
+    <label>
+      USGS site numbers
+      <input
+        id="site-input"
+        value="08330000, 08340500"
+        aria-label="Comma-separated USGS site numbers"
+      >
+    </label>
+
+    <button id="load-button" type="button">Load current discharge</button>
+  </div>
+
+  <p id="status" class="muted">Python is loading…</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>USGS gage</th>
+          <th>Observation time (UTC)</th>
+          <th class="numeric">Discharge</th>
+          <th>Units</th>
+          <th>Approval status</th>
+          <th>Qualifier</th>
+        </tr>
+      </thead>
+      <tbody id="results-body">
+        <tr>
+          <td colspan="6" class="muted">Waiting for a request.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script type="py" src="./usgs_discharge.py" config='{"packages": []}'></script>
+</body>
+</html>
