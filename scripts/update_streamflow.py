@@ -1,11 +1,13 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 import requests
 
 
+# Change only each display-name string. Site numbers stay internal.
 GAGES = [
     {"site": "08313000", "name": "REPLACE WITH GAGE NAME"},
     {"site": "08317400", "name": "REPLACE WITH GAGE NAME"},
@@ -29,186 +31,212 @@ GAGES = [
     {"site": "08359500", "name": "REPLACE WITH GAGE NAME"},
 ]
 
-SITE_IDS = [gage["site"] for gage in GAGES]
-NAME_BY_SITE = {gage["site"]: gage["name"] for gage in GAGES}
+API_ROOT = "https://api.waterdata.usgs.gov/ogcapi/v1/collections"
+DISCHARGE_PARAMETER = "00060"
 
-USGS_IV_URL = "https://waterservices.usgs.gov/nwis/iv/"
 LOOKBACK_HOURS = 2
 MIN_PRIOR_MINUTES = 30
 MAX_PRIOR_MINUTES = 90
 
+OUTPUT_PATH = Path("data/streamflow.json")
 
-def parse_usgs_time(value):
+
+def parse_time(value):
+    if not value:
+        return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def select_prior_value(values, latest_time):
+def api_url(collection, params):
+    return f"{API_ROOT}/{collection}/items?{urlencode(params)}"
+
+
+def get_json(session, collection, params):
+    response = session.get(
+        api_url(collection, params),
+        timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def discharge_observations(payload):
+    return [
+        feature.get("properties", {})
+        for feature in payload.get("features", [])
+        if feature.get("properties", {}).get("parameter_code")
+        == DISCHARGE_PARAMETER
+    ]
+
+
+def get_latest_discharge(session, site_number):
+    payload = get_json(
+        session,
+        "latest-continuous",
+        {
+            "f": "json",
+            "monitoring_location_id": f"USGS-{site_number}",
+            "parameter_code": DISCHARGE_PARAMETER,
+            "limit": 20,
+        },
+    )
+
+    observations = discharge_observations(payload)
+
+    if not observations:
+        return None
+
+    observations.sort(
+        key=lambda observation: observation.get("time", ""),
+        reverse=True,
+    )
+    return observations[0]
+
+
+def get_prior_discharge(session, site_number, latest_time):
+    latest_dt = parse_time(latest_time)
+
+    if latest_dt is None:
+        return None
+
+    start_dt = latest_dt - timedelta(hours=LOOKBACK_HOURS)
+
+    payload = get_json(
+        session,
+        "continuous",
+        {
+            "f": "json",
+            "monitoring_location_id": f"USGS-{site_number}",
+            "parameter_code": DISCHARGE_PARAMETER,
+            "datetime": (
+                f"{start_dt.isoformat()}/{latest_dt.isoformat()}"
+            ),
+            "limit": 500,
+        },
+    )
+
     candidates = []
 
-    for item in values:
-        try:
-            observation_time = parse_usgs_time(item["dateTime"])
-            discharge = float(item["value"])
-        except (KeyError, TypeError, ValueError):
+    for observation in discharge_observations(payload):
+        observation_time = parse_time(observation.get("time"))
+
+        if observation_time is None:
             continue
 
         age_minutes = (
-            latest_time - observation_time
+            latest_dt - observation_time
         ).total_seconds() / 60
 
         if MIN_PRIOR_MINUTES <= age_minutes <= MAX_PRIOR_MINUTES:
             candidates.append(
-                (
-                    abs(age_minutes - 60),
-                    discharge,
-                    observation_time,
-                )
+                (abs(age_minutes - 60), observation)
             )
 
     if not candidates:
         return None
 
     candidates.sort(key=lambda item: item[0])
-    _, discharge, observation_time = candidates[0]
-
-    return {
-        "discharge_cfs": discharge,
-        "time_utc": observation_time.isoformat(),
-    }
+    return candidates[0][1]
 
 
-def retrieve_discharge():
-    params = {
-        "format": "json",
-        "sites": ",".join(SITE_IDS),
-        "parameterCd": "00060",
-        "siteStatus": "all",
-        "period": f"PT{LOOKBACK_HOURS}H",
-    }
+def calculate_rate(latest, prior):
+    if latest is None or prior is None:
+        return None
 
-    api_key = os.environ.get("USGS_API_KEY")
+    try:
+        latest_flow = float(latest["value"])
+        prior_flow = float(prior["value"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    latest_time = parse_time(latest.get("time"))
+    prior_time = parse_time(prior.get("time"))
+
+    if latest_time is None or prior_time is None:
+        return None
+
+    elapsed_hours = (
+        latest_time - prior_time
+    ).total_seconds() / 3600
+
+    if elapsed_hours <= 0:
+        return None
+
+    return (latest_flow - prior_flow) / elapsed_hours
+
+
+def make_session():
+    session = requests.Session()
+    session.headers.update(
+        {
+            "Accept": "application/geo+json, application/json",
+            "User-Agent": "NM-streamflow-dashboard/1.0",
+        }
+    )
+
+    api_key = os.getenv("USGS_API_KEY")
 
     if api_key:
-        params["api_key"] = api_key
+        session.headers["X-Api-Key"] = api_key
 
-    response = requests.get(
-        USGS_IV_URL,
-        params=params,
-        timeout=60,
-        headers={"User-Agent": "GitHub streamflow dashboard"},
-    )
-    response.raise_for_status()
-
-    return response.json()
-
-
-def extract_rows(payload):
-    series = payload.get("value", {}).get("timeSeries", [])
-    records_by_site = {}
-
-    for time_series in series:
-        source_info = time_series.get("sourceInfo", {})
-        site_code_list = source_info.get("siteCode", [])
-
-        if not site_code_list:
-            continue
-
-        site_number = site_code_list[0].get("value")
-
-        if site_number not in NAME_BY_SITE:
-            continue
-
-        value_sets = time_series.get("values", [])
-
-        if not value_sets:
-            continue
-
-        values = value_sets[0].get("value", [])
-
-        parsed_values = []
-
-        for item in values:
-            try:
-                parsed_values.append(
-                    (
-                        parse_usgs_time(item["dateTime"]),
-                        float(item["value"]),
-                    )
-                )
-            except (KeyError, TypeError, ValueError):
-                continue
-
-        if not parsed_values:
-            continue
-
-        parsed_values.sort(key=lambda item: item[0])
-        latest_time, latest_discharge = parsed_values[-1]
-
-        prior = select_prior_value(values, latest_time)
-
-        rate = None
-
-        if prior is not None:
-            prior_time = parse_usgs_time(prior["time_utc"])
-            elapsed_hours = (
-                latest_time - prior_time
-            ).total_seconds() / 3600
-
-            if elapsed_hours > 0:
-                rate = (
-                    latest_discharge - prior["discharge_cfs"]
-                ) / elapsed_hours
-
-        records_by_site[site_number] = {
-            "site_number": site_number,
-            "gage_name": NAME_BY_SITE[site_number],
-            "discharge_cfs": latest_discharge,
-            "measurement_time_utc": latest_time.isoformat(),
-            "change_cfs_per_hour": rate,
-        }
-
-    rows = []
-
-    for gage in GAGES:
-        site = gage["site"]
-
-        rows.append(
-            records_by_site.get(
-                site,
-                {
-                    "site_number": site,
-                    "gage_name": gage["name"],
-                    "discharge_cfs": None,
-                    "measurement_time_utc": None,
-                    "change_cfs_per_hour": None,
-                },
-            )
-        )
-
-    return rows
+    return session
 
 
 def main():
-    payload = retrieve_discharge()
-    rows = extract_rows(payload)
+    rows = []
+
+    with make_session() as session:
+        for gage in GAGES:
+            latest = get_latest_discharge(session, gage["site"])
+
+            prior = (
+                get_prior_discharge(
+                    session,
+                    gage["site"],
+                    latest["time"],
+                )
+                if latest is not None
+                else None
+            )
+
+            rows.append(
+                {
+                    "site_number": gage["site"],
+                    "gage_name": gage["name"],
+                    "discharge_cfs": (
+                        float(latest["value"])
+                        if latest is not None
+                        else None
+                    ),
+                    "measurement_time_utc": (
+                        latest.get("time")
+                        if latest is not None
+                        else None
+                    ),
+                    "change_cfs_per_hour": calculate_rate(
+                        latest,
+                        prior,
+                    ),
+                }
+            )
 
     output = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "source": "USGS NWIS instantaneous values",
-        "parameter_code": "00060",
+        "source": "USGS Water Data OGC API",
+        "parameter_code": DISCHARGE_PARAMETER,
         "units": {
             "discharge": "ft3/s",
             "change_rate": "ft3/s/hour",
         },
         "gages_with_current_discharge": sum(
-            row["discharge_cfs"] is not None for row in rows
+            row["discharge_cfs"] is not None
+            for row in rows
         ),
         "gages": rows,
     }
 
-    output_path = Path("data/streamflow.json")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(
         json.dumps(output, indent=2) + "\n",
         encoding="utf-8",
     )
