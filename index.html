@@ -3,84 +3,81 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>USGS Current Discharge</title>
+
+  <title>Current USGS Streamflow</title>
 
   <script type="module" src="https://pyscript.net/releases/2025.5.1/core.js"></script>
 
   <style>
     :root {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #15202b;
-      background: #f6f8fa;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Helvetica, Arial, sans-serif;
+      color: #17212b;
+      background: #f4f7f9;
     }
 
     body {
-      max-width: 1050px;
+      max-width: 1200px;
       margin: 2rem auto;
-      padding: 0 1rem;
+      padding: 0 1rem 2rem;
     }
 
     h1 {
-      margin-bottom: 0.35rem;
+      margin: 0;
+      font-size: clamp(1.55rem, 4vw, 2.1rem);
     }
 
-    .note {
-      color: #536471;
-      margin-top: 0;
+    .description {
+      max-width: 80ch;
+      margin: 0.55rem 0 1.3rem;
+      color: #4c5b66;
+      line-height: 1.45;
     }
 
-    .controls {
+    .toolbar {
       display: flex;
       flex-wrap: wrap;
       gap: 0.75rem;
-      align-items: end;
-      margin: 1.5rem 0;
-    }
-
-    label {
-      display: grid;
-      gap: 0.35rem;
-      font-weight: 600;
-    }
-
-    input {
-      min-width: min(100%, 420px);
-      padding: 0.65rem;
-      font: inherit;
-      border: 1px solid #aab8c2;
-      border-radius: 0.35rem;
+      align-items: center;
+      margin-bottom: 0.8rem;
     }
 
     button {
-      padding: 0.65rem 1rem;
-      font: inherit;
-      font-weight: 650;
-      color: white;
-      background: #1667a8;
+      padding: 0.65rem 0.95rem;
       border: 0;
       border-radius: 0.35rem;
+      color: #fff;
+      background: #1265a4;
+      font: inherit;
+      font-weight: 650;
       cursor: pointer;
     }
 
-    button:hover {
-      background: #0e528a;
+    button:hover:not(:disabled) {
+      background: #0c4e80;
+    }
+
+    button:disabled {
+      cursor: progress;
+      opacity: 0.7;
     }
 
     #status {
-      min-height: 1.5rem;
-      margin: 0.75rem 0;
+      min-height: 1.4rem;
+      margin: 0;
+      color: #52616b;
     }
 
     .error {
-      color: #a61b1b;
+      color: #a21717 !important;
       font-weight: 600;
     }
 
     .table-wrap {
       overflow-x: auto;
-      background: white;
-      border: 1px solid #d7dde3;
+      border: 1px solid #d5dce1;
       border-radius: 0.45rem;
+      background: #fff;
     }
 
     table {
@@ -88,19 +85,28 @@
       border-collapse: collapse;
     }
 
-    th, td {
+    th,
+    td {
       padding: 0.7rem 0.8rem;
+      border-bottom: 1px solid #e5eaee;
       text-align: left;
-      border-bottom: 1px solid #e7ebef;
-      white-space: nowrap;
+      vertical-align: top;
     }
 
     th {
-      background: #edf4f8;
+      position: sticky;
+      top: 0;
+      background: #eaf2f6;
+      color: #243746;
+      font-size: 0.88rem;
     }
 
-    tr:last-child td {
+    tbody tr:last-child td {
       border-bottom: 0;
+    }
+
+    tbody tr:hover {
+      background: #f7fafc;
     }
 
     .numeric {
@@ -108,62 +114,67 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .provisional {
-      color: #875900;
+    .positive {
+      color: #0b6b39;
+      font-weight: 650;
     }
 
-    .approved {
-      color: #176b3a;
+    .negative {
+      color: #a11f1f;
+      font-weight: 650;
     }
 
-    .muted {
-      color: #536471;
+    .no-data {
+      color: #687782;
+    }
+
+    .small {
+      margin-top: 0.85rem;
+      color: #63727d;
+      font-size: 0.86rem;
+      line-height: 1.4;
     }
   </style>
 </head>
 
 <body>
-  <h1>USGS current stream discharge</h1>
-  <p class="note">
-    Fetches the most recent USGS continuous-discharge observation
-    (parameter code 00060) for each requested streamgage.
+  <h1>Current USGS Streamflow</h1>
+
+  <p class="description">
+    Most recent provisional discharge observations for selected New Mexico
+    streamgages. Change rate is computed from the most recent discharge and
+    the observation nearest to one hour earlier.
   </p>
 
-  <div class="controls">
-    <label>
-      USGS site numbers
-      <input
-        id="site-input"
-        value="08330000, 08340500"
-        aria-label="Comma-separated USGS site numbers"
-      >
-    </label>
-
-    <button id="load-button" type="button">Load current discharge</button>
+  <div class="toolbar">
+    <button id="refresh-button" type="button">Refresh data</button>
+    <p id="status">Loading Python runtime…</p>
   </div>
 
-  <p id="status" class="muted">Python is loading…</p>
-
   <div class="table-wrap">
-    <table>
+    <table aria-label="Current USGS discharge observations">
       <thead>
         <tr>
-          <th>USGS gage</th>
-          <th>Observation time (UTC)</th>
-          <th class="numeric">Discharge</th>
-          <th>Units</th>
-          <th>Approval status</th>
-          <th>Qualifier</th>
+          <th>Gage name</th>
+          <th class="numeric">Current discharge<br>(ft³/s)</th>
+          <th>Measurement time<br>(local)</th>
+          <th class="numeric">Change over prior hour<br>(ft³/s/hour)</th>
         </tr>
       </thead>
-      <tbody id="results-body">
+      <tbody id="gage-results">
         <tr>
-          <td colspan="6" class="muted">Waiting for a request.</td>
+          <td colspan="4" class="no-data">Waiting for USGS data…</td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <script type="py" src="./usgs_discharge.py" config='{"packages": []}'></script>
+  <p class="small">
+    USGS real-time data are commonly provisional. A blank or em dash means
+    that a current discharge series or a suitable prior-hour observation was
+    not available for that gage.
+  </p>
+
+  <script type="py" src="./app.py"></script>
 </body>
 </html>
