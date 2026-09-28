@@ -3,10 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
+  <meta name="description" content="Current USGS streamflow conditions for selected New Mexico streamgages.">
   <title>Current USGS Streamflow</title>
-
-  <script type="module" src="https://pyscript.net/releases/2025.5.1/core.js"></script>
 
   <style>
     :root {
@@ -14,6 +12,10 @@
         Roboto, Helvetica, Arial, sans-serif;
       color: #17212b;
       background: #f4f7f9;
+    }
+
+    * {
+      box-sizing: border-box;
     }
 
     body {
@@ -94,8 +96,6 @@
     }
 
     th {
-      position: sticky;
-      top: 0;
       background: #eaf2f6;
       color: #243746;
       font-size: 0.88rem;
@@ -147,8 +147,8 @@
   </p>
 
   <div class="toolbar">
-    <button id="refresh-button" type="button">Refresh data</button>
-    <p id="status">Loading Python runtime…</p>
+    <button id="refresh-button" type="button">Refresh display</button>
+    <p id="status">Loading the latest scheduled streamflow update…</p>
   </div>
 
   <div class="table-wrap">
@@ -163,18 +163,19 @@
       </thead>
       <tbody id="gage-results">
         <tr>
-          <td colspan="4" class="no-data">Waiting for USGS data…</td>
+          <td colspan="4" class="no-data">
+            Waiting for the latest scheduled streamflow data…
+          </td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <p class="small">
-    USGS real-time data are commonly provisional. A blank or em dash means
-    that a current discharge series or a suitable prior-hour observation was
-    not available for that gage.
+    USGS real-time data are commonly provisional. The display refreshes the
+    most recently generated data file; it does not directly query USGS.
   </p>
 
-  <script type="py" src="./app.py"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
