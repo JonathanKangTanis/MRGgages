@@ -1,0 +1,42 @@
+name: Update streamflow data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-streamflow
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Retrieve and process USGS data
+        env:
+          USGS_API_KEY: ${{ secrets.USGS_API_KEY }}
+        run: python scripts/update_streamflow.py
+
+      - name: Commit updated data when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/streamflow.json
+          git diff --cached --quiet || git commit -m "Update streamflow data"
+          git push
