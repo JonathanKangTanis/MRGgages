@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-14T06:47:01.864918+00:00",
+  "generated_at_utc": "2026-10-14T12:28:59.962358+00:00",
   "source": "USGS Water Data OGC API",
   "parameter_code": "00060",
   "units": {
@@ -11,142 +11,142 @@
     {
       "site_number": "08313000",
       "gage_name": "Rio Grande at Otowi Bridge",
-      "discharge_cfs": 437.0,
-      "measurement_time_utc": "2026-10-14T06:00:00+00:00",
+      "discharge_cfs": 424.0,
+      "measurement_time_utc": "2026-10-14T12:00:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08317400",
       "gage_name": "Rio Grande below Cochiti Dam",
-      "discharge_cfs": 415.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
-      "change_cfs_per_hour": 8.0
+      "discharge_cfs": 407.0,
+      "measurement_time_utc": "2026-10-14T12:15:00+00:00",
+      "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08328950",
       "gage_name": "Jemez River below Jemez Canyon Dam",
       "discharge_cfs": 0.0,
-      "measurement_time_utc": "2026-10-14T05:45:00+00:00",
+      "measurement_time_utc": "2026-10-14T11:45:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08329900",
       "gage_name": "North Diversion Channel",
-      "discharge_cfs": 0.01,
-      "measurement_time_utc": "2026-10-14T06:35:00+00:00",
-      "change_cfs_per_hour": -0.03
+      "discharge_cfs": 0.0,
+      "measurement_time_utc": "2026-10-14T12:05:00+00:00",
+      "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08329918",
       "gage_name": "Rio Grande at Alameda Bridge",
-      "discharge_cfs": 398.0,
-      "measurement_time_utc": "2026-10-14T06:30:00+00:00",
-      "change_cfs_per_hour": -22.0
+      "discharge_cfs": 360.0,
+      "measurement_time_utc": "2026-10-14T11:30:00+00:00",
+      "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08329928",
       "gage_name": "Rio Grande at Paseo del Norte",
-      "discharge_cfs": 394.0,
-      "measurement_time_utc": "2026-10-14T06:00:00+00:00",
-      "change_cfs_per_hour": -10.0
+      "discharge_cfs": 326.0,
+      "measurement_time_utc": "2026-10-14T12:00:00+00:00",
+      "change_cfs_per_hour": -8.0
     },
     {
       "site_number": "08330000",
       "gage_name": "Rio Grande at Central Bridge",
-      "discharge_cfs": 297.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
-      "change_cfs_per_hour": -5.0
+      "discharge_cfs": 268.0,
+      "measurement_time_utc": "2026-10-14T12:15:00+00:00",
+      "change_cfs_per_hour": -15.0
     },
     {
       "site_number": "08330775",
       "gage_name": "South Diversion Channel",
       "discharge_cfs": 0.0,
-      "measurement_time_utc": "2026-10-14T06:35:00+00:00",
+      "measurement_time_utc": "2026-10-14T12:05:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08330830",
       "gage_name": "Rio Grande at Valle del Oro",
-      "discharge_cfs": 352.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
-      "change_cfs_per_hour": 0.0
+      "discharge_cfs": 306.0,
+      "measurement_time_utc": "2026-10-14T12:15:00+00:00",
+      "change_cfs_per_hour": -23.0
     },
     {
       "site_number": "08330875",
       "gage_name": "Rio Grande at Isleta Lakes",
-      "discharge_cfs": 344.0,
-      "measurement_time_utc": "2026-10-14T06:00:00+00:00",
-      "change_cfs_per_hour": 0.0
+      "discharge_cfs": 350.0,
+      "measurement_time_utc": "2026-10-14T12:00:00+00:00",
+      "change_cfs_per_hour": -6.0
     },
     {
       "site_number": "08331160",
       "gage_name": "Rio Grande near Bosque Farms",
-      "discharge_cfs": 252.0,
-      "measurement_time_utc": "2026-10-14T05:45:00+00:00",
+      "discharge_cfs": 231.0,
+      "measurement_time_utc": "2026-10-14T11:45:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08331510",
       "gage_name": "Rio Grande at Hwy 346",
-      "discharge_cfs": 354.0,
-      "measurement_time_utc": "2026-10-14T05:45:00+00:00",
-      "change_cfs_per_hour": -3.0
+      "discharge_cfs": 325.0,
+      "measurement_time_utc": "2026-10-14T11:45:00+00:00",
+      "change_cfs_per_hour": -12.0
     },
     {
       "site_number": "08332010",
       "gage_name": "Rio Grande near Bernardo",
-      "discharge_cfs": 270.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
+      "discharge_cfs": 261.0,
+      "measurement_time_utc": "2026-10-14T11:15:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08353000",
       "gage_name": "Rio Puerco",
       "discharge_cfs": 0.0,
-      "measurement_time_utc": "2026-10-14T06:00:00+00:00",
+      "measurement_time_utc": "2026-10-14T12:00:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08354900",
       "gage_name": "Rio Grande at San Acacia",
       "discharge_cfs": 639.0,
-      "measurement_time_utc": "2026-10-14T05:45:00+00:00",
-      "change_cfs_per_hour": 0.0
+      "measurement_time_utc": "2026-10-14T11:45:00+00:00",
+      "change_cfs_per_hour": -6.0
     },
     {
       "site_number": "08355050",
       "gage_name": "Rio Grande at Escondida",
-      "discharge_cfs": 163.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
-      "change_cfs_per_hour": 0.0
+      "discharge_cfs": 160.0,
+      "measurement_time_utc": "2026-10-14T11:15:00+00:00",
+      "change_cfs_per_hour": 1.0
     },
     {
       "site_number": "08355490",
       "gage_name": "Rio Grande above Hwy 380",
       "discharge_cfs": 372.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
+      "measurement_time_utc": "2026-10-14T11:15:00+00:00",
       "change_cfs_per_hour": 0.0
     },
     {
       "site_number": "08358300",
       "gage_name": "Conveyance Channel at San Marcial",
-      "discharge_cfs": 120.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
+      "discharge_cfs": 112.0,
+      "measurement_time_utc": "2026-10-14T11:15:00+00:00",
       "change_cfs_per_hour": -1.0
     },
     {
       "site_number": "08358400",
       "gage_name": "Rio Grande at San Marcial",
-      "discharge_cfs": 284.0,
-      "measurement_time_utc": "2026-10-14T05:45:00+00:00",
+      "discharge_cfs": 268.0,
+      "measurement_time_utc": "2026-10-14T11:45:00+00:00",
       "change_cfs_per_hour": -3.0
     },
     {
       "site_number": "08359500",
       "gage_name": "Elephant Butte Narrows",
-      "discharge_cfs": 298.0,
-      "measurement_time_utc": "2026-10-14T06:15:00+00:00",
-      "change_cfs_per_hour": -11.0
+      "discharge_cfs": 277.0,
+      "measurement_time_utc": "2026-10-14T11:15:00+00:00",
+      "change_cfs_per_hour": 0.0
     }
   ]
 }
